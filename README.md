@@ -1,7 +1,7 @@
 # PNM-DDoS
 Made by Nhatminhdzz:
 **PNM-DDoS** is a Python-based **DDoS Tool** for educational and testing purposes only.
-repo:https://github.com/pnhatminh645-afk/Nhatminhdzz
+repo:[https://github.com/pnhatminh645-afk/Nhatminhdzz](https://github.com/hdfhsth/Nhatminhdzz)
 
 > **DISCLAIMER:**  
 > This repository is strictly for educational, research, and network testing purposes only.  
@@ -48,7 +48,7 @@ repo:https://github.com/pnhatminh645-afk/Nhatminhdzz
 ### 1. Clone the Repository
 
 ```sh
-git clone https://github.com/pnhatminh645-afk/Nhatminhdzz
+git clone https://github.com/hdfhsth/Nhatminhdzz
 cd Nhatminhdzz
 ```
 
@@ -70,7 +70,7 @@ run: ```rm -rf Nhatminhdzz``` before
 ```sh
 pkg update && pkg upgrade
 pkg install git python
-git clone https://github.com/pnhatminh645-afk/Nhatminhdzz
+git clone https://github.com/hdfhsth/Nhatminhdzz
 cd Nhatminhdzz
 pip install -r requirements.txt
 python3 start.py
@@ -81,7 +81,7 @@ python3 start.py
 ```sh
 sudo apt update && sudo apt upgrade
 sudo apt install git python3 python3-pip
-git clone https://github.com/pnhatminh645-afk/Nhatminhdzz
+git clone https://github.com/hdfhsth/Nhatminhdzz
 cd Nhatminhdzz
 pip3 install -r requirements.txt
 python3 start.py
@@ -92,7 +92,7 @@ python3 start.py
 1. Download & install [Python](https://www.python.org/downloads/).
 2. Open `cmd` or PowerShell and run:
     ```sh
-    git clone https://github.com/pnhatminh645-afk/Nhatminhdzz
+    git clone https://github.com/hdfhsth/Nhatminhdzz
     cd Nhatminhdzz
     pip install -r requirements.txt
     python start.py
@@ -102,7 +102,7 @@ python3 start.py
 
 ```sh
 brew install git python3
-git clone https://github.com/pnhatminh645-afk/Nhatminhdzz
+git clone https://github.com/hdfhsth/Nhatminhdzz
 cd Nhatminhdzz
 pip3 install -r requirements.txt
 python3 start.py
