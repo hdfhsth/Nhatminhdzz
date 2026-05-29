@@ -108,19 +108,32 @@ async def main():
 
     start_time = time.time()
     success = 0
-    connector = aiohttp_socks.ProxyConnector.from_url(random.choice(proxies))
+    start_time = time.time()
+    success = 0
+    tasks = []
+    i = 0
 
-    async with aiohttp.ClientSession(connector=connector) as session:
-        tasks = []
-        i = 0
-
+    # Thay thế toàn bộ đoạn cũ bằng đoạn này:
+    async with aiohttp.ClientSession() as session:
         while (total == 0 or i < total):
             i += 1
-            task = asyncio.create_task(send_request(session, url, i, random.choice(proxies)))
+            proxy_url = random.choice(proxies)
+            
+            # Kiểm tra nhanh nếu proxy thiếu dấu ':' (không có port) thì bỏ qua
+            if ":" not in proxy_url.replace("socks5://", ""):
+                continue
+
+            # Task gửi request
+            task = asyncio.create_task(send_request(session, url, i, proxy_url))
             tasks.append(task)
 
             if len(tasks) >= concurrency:
-                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for t in done:
+                    try:
+                        if t.result() == 1: success += 1
+                    except: pass
+                tasks = list(pending)
                 success += sum(1 for t in done if t.result() == 1)
                 tasks = [t for t in tasks if not t.done()]
 
