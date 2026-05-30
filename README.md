@@ -94,10 +94,16 @@ python3 start.py
     ```sh
     git clone https://github.com/hdfhsth/Nhatminhdzz
     cd Nhatminhdzz
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
     python start.py
     ```
-
+    or
+    ```sh
+    git clone https://github.com/hdfhsth/Nhatminhdzz
+    cd Nhatminhdzz
+    python -m pip install -r requirements.txt
+    py start.py
+    ```
 ### MacOS
 
 ```sh
